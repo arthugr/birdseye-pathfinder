@@ -1,0 +1,1848 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>
+      Maze Pathfinding — Dijkstra · A* · Hybrid · Bird’s-eye (Fast Compare +
+      Band Limit)
+    </title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #0b0f0c;
+        color: #e7f2ec;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      }
+      #app {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        grid-template-columns: 1fr 540px;
+      }
+      #view {
+        position: relative;
+      }
+      #hud {
+        background: rgba(15, 22, 18, 0.85);
+        border-left: 1px solid rgba(255, 255, 255, 0.06);
+        padding: 16px 14px;
+        overflow: auto;
+      }
+      h1 {
+        margin: 0 0 10px;
+        font-size: 18px;
+        font-weight: 700;
+        letter-spacing: 0.2px;
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 8px;
+        align-items: center;
+        margin: 8px 0;
+      }
+      button,
+      select,
+      input[type="number"],
+      input[type="range"],
+      input[type="checkbox"] {
+        background: #0f1512;
+        color: #e7f2ec;
+        border: 1px solid #26322b;
+        border-radius: 10px;
+        padding: 8px 10px;
+        font-size: 14px;
+      }
+      button {
+        cursor: pointer;
+      }
+      .legend {
+        display: grid;
+        grid-template-columns: 14px auto;
+        gap: 8px;
+        align-items: center;
+        row-gap: 6px;
+        margin-top: 10px;
+      }
+      .dot {
+        width: 14px;
+        height: 14px;
+        border-radius: 3px;
+      }
+      .small {
+        font-size: 12px;
+        opacity: 0.85;
+      }
+      .pill {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 999px;
+        border: 1px solid #26322b;
+        background: #0f1512;
+        font-size: 12px;
+        margin-left: 6px;
+      }
+      .card {
+        border: 1px solid #26322b;
+        border-radius: 12px;
+        padding: 10px;
+        background: #0f1512;
+        margin-top: 10px;
+      }
+      .card h2 {
+        margin: 0 0 8px;
+        font-size: 14px;
+        font-weight: 700;
+      }
+      .kv {
+        display: grid;
+        grid-template-columns: auto auto auto auto auto;
+        gap: 6px 12px;
+        font-size: 12px;
+      }
+      .kv div:nth-child(-n + 5) {
+        opacity: 0.8;
+      }
+      .dim {
+        opacity: 0.8;
+      }
+      .subnote {
+        font-size: 11px;
+        opacity: 0.7;
+        margin-top: -6px;
+      }
+      .sep {
+        height: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div id="view"></div>
+      <aside id="hud">
+        <h1>Maze Pathfinding <span class="pill">Three.js</span></h1>
+
+        <div class="row">
+          <label>Visualize</label>
+          <select id="algo">
+            <option value="dijkstra">Dijkstra (step-by-step)</option>
+            <option value="hybrid" selected>Hybrid (step-by-step)</option>
+            <option value="bird">Bird’s-eye (instant)</option>
+          </select>
+        </div>
+
+        <div class="row">
+          <label>Grid size (odd)</label>
+          <input
+            id="size"
+            type="number"
+            min="11"
+            max="81"
+            step="2"
+            value="41"
+          />
+        </div>
+
+        <div class="row">
+          <label>Braid dead-ends (%)</label>
+          <input id="braid" type="range" min="0" max="40" step="2" value="12" />
+        </div>
+
+        <div class="row">
+          <label>Extra links (%)</label>
+          <input id="links" type="range" min="0" max="40" step="2" value="10" />
+        </div>
+
+        <div class="row">
+          <label>Tie density (%)</label>
+          <input id="ties" type="range" min="0" max="80" step="5" value="30" />
+        </div>
+
+        <div class="row">
+          <label>Weighted terrain</label>
+          <input id="weighted" type="checkbox" checked />
+        </div>
+
+        <div class="row">
+          <label>Hybrid k</label>
+          <input id="k" type="number" min="1" max="8" step="1" value="3" />
+        </div>
+
+        <div class="row">
+          <label>Playback speed</label>
+          <input
+            id="speed"
+            type="range"
+            min="0.2"
+            max="3"
+            step="0.1"
+            value="1"
+          />
+        </div>
+
+        <div class="row">
+          <button id="regen">🧩 New Maze</button>
+          <button id="reset">↺ Reset</button>
+        </div>
+        <div class="row">
+          <button id="play">▶ Play</button>
+          <button id="step">Step</button>
+        </div>
+        <div class="row">
+          <button id="birdseye">🛰️ Distance Field & Path</button>
+        </div>
+        <div class="row">
+          <label>Heat opacity</label>
+          <input
+            id="heat"
+            type="range"
+            min="0"
+            max="1"
+            step="0.05"
+            value="0.6"
+          />
+        </div>
+
+        <div class="legend">
+          <div class="dot" style="background: #000000"></div>
+          <div>Wall</div>
+          <div class="dot" style="background: #1a2a23"></div>
+          <div>Floor</div>
+          <div class="dot" style="background: #14e38e"></div>
+          <div>Visited / Complete</div>
+          <div class="dot" style="background: #c8a64d"></div>
+          <div>Frontier / Pivot</div>
+          <div class="dot" style="background: #7e1718"></div>
+          <div>Relax improved</div>
+          <div class="dot" style="background: #00e5ff"></div>
+          <div>Start</div>
+          <div class="dot" style="background: #ff52e6"></div>
+          <div>Goal</div>
+          <div class="dot" style="background: #9fe2c5"></div>
+          <div>Final shortest path</div>
+        </div>
+
+        <div class="card">
+          <h2>⚡ Fast Compare Settings</h2>
+          <div class="row">
+            <label>Fast compare (no step recording)</label>
+            <input id="fastMode" type="checkbox" checked />
+          </div>
+          <div class="row">
+            <label>Use Dial’s buckets (1..9 weights)</label>
+            <input id="useBuckets" type="checkbox" checked />
+          </div>
+          <div class="sep"></div>
+          <div class="row">
+            <label>Bird’s-eye band limit</label>
+            <input id="bandOn" type="checkbox" />
+          </div>
+          <div class="row">
+            <label>Band radius R (cells)</label>
+            <input
+              id="bandR"
+              type="number"
+              min="2"
+              max="50"
+              step="1"
+              value="8"
+            />
+          </div>
+          <div class="subnote">
+            Band limits the goal-rooted flood to a corridor around the straight
+            line from start→goal. Faster, but may miss optimal paths if R is too
+            small.
+          </div>
+        </div>
+
+        <div
+          id="stats"
+          class="small"
+          style="margin-top: 12px; line-height: 1.4"
+        ></div>
+
+        <div class="row" style="margin-top: 6px">
+          <button id="compare">📊 Compare All (same maze)</button>
+          <span class="dim"></span>
+        </div>
+
+        <div id="comparePanel" class="card" style="display: none">
+          <h2>Side-by-Side Comparison</h2>
+          <div class="kv" id="cmpGrid"></div>
+        </div>
+      </aside>
+    </div>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+      }
+    </script>
+
+    <script type="module">
+      import * as THREE from "three";
+      import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+      // ---------- helpers ----------
+      const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+      const INF = 1e15;
+      const COLORS = {
+        wall: 0x000000,
+        floor: 0x1a2a23,
+        visited: 0x14e38e,
+        frontier: 0xc8a64d,
+        improved: 0x7e1718,
+        start: 0x00e5ff,
+        goal: 0xff52e6,
+        path: 0x9fe2c5,
+      };
+
+      function heatColor(t) {
+        const stops = [
+          new THREE.Color(0x1e3a8a),
+          new THREE.Color(0x06b6d4),
+          new THREE.Color(0x22c55e),
+          new THREE.Color(0xeab308),
+          new THREE.Color(0xef4444),
+        ];
+        const n = stops.length - 1;
+        const x = Math.max(0, Math.min(0.999, t));
+        const i = Math.floor(x * n);
+        const frac = x * n - i;
+        return stops[i]
+          .clone()
+          .lerp(stops[i + 1], frac)
+          .getHex();
+      }
+
+      // ---------- scene ----------
+      const container = document.getElementById("view");
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setPixelRatio(devicePixelRatio);
+      renderer.setSize(container.clientWidth, container.clientHeight);
+      container.appendChild(renderer.domElement);
+
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x0b0f0c);
+
+      const camera = new THREE.OrthographicCamera(-20, 20, 14, -14, 0.1, 1000);
+      camera.position.set(0, 50, 0);
+      camera.lookAt(0, 0, 0);
+
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableRotate = false;
+      controls.enableDamping = true;
+      controls.maxZoom = 2.5;
+      controls.minZoom = 0.3;
+      scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+
+      window.addEventListener("resize", () => {
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        const aspect = container.clientWidth / container.clientHeight;
+        const viewSize = 28;
+        camera.left = -viewSize * aspect * 0.5;
+        camera.right = viewSize * aspect * 0.5;
+        camera.top = viewSize * 0.5;
+        camera.bottom = -viewSize * 0.5;
+        camera.updateProjectionMatrix();
+      });
+
+      // ---------- Maze generation ----------
+      function genMaze(N) {
+        const W = N,
+          H = N,
+          wall = 1,
+          cell = 0;
+        const grid = Array.from({ length: H }, () => Array(W).fill(wall));
+        function carve(x, y) {
+          grid[y][x] = cell;
+          const dirs = [
+            [2, 0],
+            [-2, 0],
+            [0, 2],
+            [0, -2],
+          ];
+          for (let i = dirs.length - 1; i > 0; i--) {
+            const j = (Math.random() * (i + 1)) | 0;
+            [dirs[i], dirs[j]] = [dirs[j], dirs[i]];
+          }
+          for (const [dx, dy] of dirs) {
+            const nx = x + dx,
+              ny = y + dy;
+            if (
+              nx > 0 &&
+              nx < W - 1 &&
+              ny > 0 &&
+              ny < H - 1 &&
+              grid[ny][nx] === wall
+            ) {
+              grid[y + dy / 2][x + dx / 2] = 0;
+              carve(nx, ny);
+            }
+          }
+        }
+        carve(1, 1);
+        return grid;
+      }
+      function braidMaze(grid, percent = 0) {
+        if (!percent) return;
+        const p = percent / 100;
+        const H = grid.length,
+          W = grid[0].length,
+          isCell = (x, y) => grid[y]?.[x] === 0;
+        for (let y = 1; y < H - 1; y++)
+          for (let x = 1; x < W - 1; x++) {
+            if (!isCell(x, y)) continue;
+            const open = [
+              [1, 0],
+              [-1, 0],
+              [0, 1],
+              [0, -1],
+            ].filter(([dx, dy]) => isCell(x + dx, y + dy));
+            if (open.length === 1 && Math.random() < p) {
+              const walls = [
+                [2, 0],
+                [-2, 0],
+                [0, 2],
+                [0, -2],
+              ].filter(([dx, dy]) => grid[y + dy]?.[x + dx] === 1);
+              if (walls.length) {
+                const [dx, dy] = walls[(Math.random() * walls.length) | 0];
+                grid[y + dy / 2][x + dx / 2] = 0;
+                grid[y + dy][x + dx] = 0;
+              }
+            }
+          }
+      }
+      function addLinks(grid, percent = 0) {
+        if (!percent) return;
+        const p = percent / 100;
+        const H = grid.length,
+          W = grid[0].length,
+          isCell = (x, y) => grid[y]?.[x] === 0;
+        for (let y = 1; y < H - 1; y++)
+          for (let x = 1; x < W - 1; x++) {
+            if (!isCell(x, y)) continue;
+            if (Math.random() < p) {
+              const walls = [
+                [2, 0],
+                [-2, 0],
+                [0, 2],
+                [0, -2],
+              ].filter(([dx, dy]) => grid[y + dy]?.[x + dx] === 1);
+              if (walls.length) {
+                const [dx, dy] = walls[(Math.random() * walls.length) | 0];
+                grid[y + dy / 2][x + dx / 2] = 0;
+                grid[y + dy][x + dx] = 0;
+              }
+            }
+          }
+      }
+
+      // weights
+      function makeWeights(grid, weighted = true) {
+        const H = grid.length,
+          W = grid[0].length;
+        const w = Array.from({ length: H }, () => Array(W).fill(INF));
+        for (let y = 0; y < H; y++)
+          for (let x = 0; x < W; x++) {
+            if (grid[y][x] === 0) {
+              if (!weighted) {
+                w[y][x] = 1;
+                continue;
+              }
+              const r = Math.random();
+              w[y][x] =
+                r < 0.7
+                  ? 1 + ((Math.random() * 2) | 0)
+                  : r < 0.9
+                  ? 4 + ((Math.random() * 3) | 0)
+                  : 7 + ((Math.random() * 3) | 0);
+            }
+          }
+        return w;
+      }
+      function applyTies(weights, grid, percent = 0) {
+        if (!percent) return;
+        const p = percent / 100;
+        const H = grid.length,
+          W = grid[0].length;
+        for (let y = 0; y < H; y++)
+          for (let x = 0; x < W; x++) {
+            if (grid[y][x] === 0 && Math.random() < p) weights[y][x] = 1;
+          }
+      }
+
+      // ---------- Grid helpers ----------
+      const DIR4 = [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ];
+      const inb = (grid, x, y) =>
+        y >= 0 && y < grid.length && x >= 0 && x < grid[0].length;
+      function neighbors(grid, x, y) {
+        const ns = [];
+        for (const [dx, dy] of DIR4) {
+          const nx = x + dx,
+            ny = y + dy;
+          if (inb(grid, nx, ny) && grid[ny][nx] === 0) ns.push([nx, ny]);
+        }
+        return ns;
+      }
+      const key = (x, y) => x + "_" + y;
+
+      // ---------- World / meshes ----------
+      const TILE = 1;
+      function toWorld(x, y, N) {
+        const half = (N - 1) / 2;
+        return new THREE.Vector3((x - half) * TILE, 0, (y - half) * TILE);
+      }
+
+      let floorGroup = new THREE.Group();
+      let wallGroup = new THREE.Group();
+      let overlayGroup = new THREE.Group();
+      scene.add(floorGroup, wallGroup, overlayGroup);
+
+      function clearGroup(g) {
+        while (g.children.length) {
+          const m = g.children.pop();
+          m.geometry?.dispose?.();
+          m.material?.dispose?.();
+        }
+      }
+      function rectBase(color, x, y, N, h = 0.1) {
+        const geo = new THREE.BoxGeometry(TILE * 0.95, h, TILE * 0.95);
+        const mat = new THREE.MeshBasicMaterial({ color });
+        const m = new THREE.Mesh(geo, mat);
+        m.position.copy(toWorld(x, y, N)).add(new THREE.Vector3(0, h / 2, 0));
+        return m;
+      }
+      function rectOverlay(
+        color,
+        x,
+        y,
+        N,
+        h = 0.1,
+        opacity = 1,
+        kind = "misc"
+      ) {
+        const geo = new THREE.BoxGeometry(TILE * 0.95, h, TILE * 0.95);
+        const mat = new THREE.MeshBasicMaterial({
+          color,
+          transparent: opacity < 1,
+          opacity,
+        });
+        const m = new THREE.Mesh(geo, mat);
+        m.position.copy(toWorld(x, y, N)).add(new THREE.Vector3(0, h / 2, 0));
+        m.userData.kind = kind;
+        return m;
+      }
+      function drawGrid(grid, weights, start, goal) {
+        clearGroup(floorGroup);
+        clearGroup(wallGroup);
+        clearGroup(overlayGroup);
+        const H = grid.length,
+          W = grid[0].length,
+          N = W;
+        for (let y = 0; y < H; y++)
+          for (let x = 0; x < W; x++) {
+            if (grid[y][x] === 1)
+              wallGroup.add(rectBase(COLORS.wall, x, y, N, 0.6));
+            else {
+              const w = weights[y][x];
+              const t = w === INF ? 0 : (w - 1) / 8;
+              const base = new THREE.Color(COLORS.floor),
+                mix = new THREE.Color(0x335f4a).multiplyScalar(t);
+              base.add(mix);
+              floorGroup.add(rectBase(base.getHex(), x, y, N, 0.1));
+            }
+          }
+        overlayGroup.add(
+          rectOverlay(COLORS.start, start.x, start.y, N, 0.22, 1, "marker")
+        );
+        overlayGroup.add(
+          rectOverlay(COLORS.goal, goal.x, goal.y, N, 0.22, 1, "marker")
+        );
+      }
+
+      // ---------- Step-by-step visual algorithms ----------
+      function dijkstraGrid(grid, weights, start, goal) {
+        const H = grid.length,
+          W = grid[0].length;
+        const dist = Array.from({ length: H }, () => Array(W).fill(INF));
+        const prev = new Map();
+        const visited = new Set();
+        const frontier = new Set();
+        dist[start.y][start.x] = 0;
+        frontier.add(key(start.x, start.y));
+        const steps = [];
+        const goalKey = key(goal.x, goal.y);
+
+        function pullMin() {
+          let best = null,
+            bd = INF;
+          for (const k of frontier) {
+            const [x, y] = k.split("_").map(Number);
+            const d = dist[y][x];
+            if (d < bd) {
+              bd = d;
+              best = k;
+            }
+          }
+          if (best) frontier.delete(best);
+          return best;
+        }
+        while (frontier.size) {
+          const kmin = pullMin();
+          if (!kmin) break;
+          const [ux, uy] = kmin.split("_").map(Number);
+          visited.add(kmin);
+          const relaxes = [];
+          let improvedCount = 0;
+          for (const [vx, vy] of neighbors(grid, ux, uy)) {
+            const nd = dist[uy][ux] + weights[vy][vx];
+            const improved = nd < dist[vy][vx];
+            if (improved) {
+              dist[vy][vx] = nd;
+              prev.set(key(vx, vy), [ux, uy]);
+              frontier.add(key(vx, vy));
+              improvedCount++;
+            }
+            relaxes.push({ from: [ux, uy], to: [vx, vy], improved });
+          }
+          steps.push({
+            type: "extract",
+            pivotsCount: 1,
+            relaxCount: relaxes.length,
+            improvedCount,
+            frontier: new Set(frontier),
+            visited: new Set(visited),
+            relaxes,
+            dist,
+            prev,
+          });
+          if (kmin === goalKey) break;
+        }
+        return steps;
+      }
+
+      function hybridGrid(grid, weights, start, goal, K = 3) {
+        const H = grid.length,
+          W = grid[0].length;
+        const dist = Array.from({ length: H }, () => Array(W).fill(INF));
+        const prev = new Map();
+        const visited = new Set();
+        let frontier = new Set([key(start.x, start.y)]);
+        dist[start.y][start.x] = 0;
+        const steps = [];
+        const goalKey = key(goal.x, goal.y);
+
+        const sortFrontier = (set) =>
+          [...set].sort((a, b) => {
+            const [ax, ay] = a.split("_").map(Number),
+              [bx, by] = b.split("_").map(Number);
+            const da = dist[ay][ax],
+              db = dist[by][bx];
+            if (da !== db) return da - db;
+            if (ay !== by) return ay - by;
+            return ax - bx;
+          });
+
+        while (frontier.size) {
+          const ord = sortFrontier(frontier);
+          let Kdyn = K,
+            F = ord.length;
+          if (F > 400) Kdyn = Math.max(1, Math.floor(K / 2));
+          else if (F > 150) Kdyn = Math.max(1, Math.floor((2 * K) / 3));
+          else if (F < 20) Kdyn = Math.min(K * 2, 8);
+          const pivots = ord.filter((_, i) => i % Kdyn === 0);
+          if (!pivots.length && ord.length) pivots.push(ord[0]);
+
+          const relaxes = [];
+          let improvedCount = 0;
+          const newly = new Set();
+          for (const pk of pivots) {
+            const [ux, uy] = pk.split("_").map(Number);
+            visited.add(pk);
+            frontier.delete(pk);
+            for (const [vx, vy] of neighbors(grid, ux, uy)) {
+              const nd = dist[uy][ux] + weights[vy][vx];
+              const improved = nd < dist[vy][vx];
+              if (improved) {
+                dist[vy][vx] = nd;
+                prev.set(key(vx, vy), [ux, uy]);
+                newly.add(key(vx, vy));
+                improvedCount++;
+              }
+              relaxes.push({ from: [ux, uy], to: [vx, vy], improved });
+            }
+          }
+          for (const k of newly) frontier.add(k);
+          if (frontier.size > Math.max(50, K * 4)) {
+            const shr = sortFrontier(frontier).filter((_, i) => i % 2 === 0);
+            frontier = new Set(shr);
+          }
+          steps.push({
+            type: "pivot-relax",
+            pivotsCount: pivots.length,
+            relaxCount: relaxes.length,
+            improvedCount,
+            frontier: new Set(frontier),
+            visited: new Set(visited),
+            relaxes,
+            dist,
+            prev,
+          });
+          if (visited.has(goalKey)) break;
+        }
+        return steps;
+      }
+
+      // Bird’s-eye visual (set-based) + path drawing
+      function distanceFieldFromGoal_visual(grid, weights, goal) {
+        const H = grid.length,
+          W = grid[0].length;
+        const dist = Array.from({ length: H }, () => Array(W).fill(INF));
+        const open = new Set();
+        dist[goal.y][goal.x] = 0;
+        open.add(key(goal.x, goal.y));
+        function popMin() {
+          let best = null,
+            bd = INF;
+          for (const k of open) {
+            const [x, y] = k.split("_").map(Number);
+            const d = dist[y][x];
+            if (d < bd) {
+              bd = d;
+              best = k;
+            }
+          }
+          if (best) open.delete(best);
+          return best;
+        }
+        while (open.size) {
+          const k = popMin();
+          if (!k) break;
+          const [ux, uy] = k.split("_").map(Number);
+          for (const [vx, vy] of neighbors(grid, ux, uy)) {
+            const nd = dist[uy][ux] + weights[vy][vx];
+            if (nd < dist[vy][vx]) {
+              dist[vy][vx] = nd;
+              open.add(key(vx, vy));
+            }
+          }
+        }
+        return dist;
+      }
+      function pathByGradient(dist, grid, start, goal) {
+        if (
+          !isFinite(dist[start.y][start.x]) ||
+          !isFinite(dist[goal.y][goal.x])
+        )
+          return [];
+        const path = [[start.x, start.y]],
+          seen = new Set([key(start.x, start.y)]);
+        let cx = start.x,
+          cy = start.y,
+          guard = grid.length * grid[0].length + 5;
+        while ((cx !== goal.x || cy !== goal.y) && guard-- > 0) {
+          let best = null,
+            bd = dist[cy][cx];
+          for (const [nx, ny] of neighbors(grid, cx, cy)) {
+            const d = dist[ny][nx];
+            if (d < bd && isFinite(d)) {
+              bd = d;
+              best = [nx, ny];
+            }
+          }
+          if (!best) break;
+          const k = key(best[0], best[1]);
+          if (seen.has(k)) break;
+          seen.add(k);
+          path.push(best);
+          cx = best[0];
+          cy = best[1];
+        }
+        return path;
+      }
+      function showDistanceField(dist, grid, start, goal, heatOpacity) {
+        while (overlayGroup.children.length > 2) {
+          const m = overlayGroup.children.pop();
+          m.geometry?.dispose?.();
+          m.material?.dispose?.();
+        }
+        let dmin = Infinity,
+          dmax = -Infinity;
+        for (let y = 0; y < grid.length; y++)
+          for (let x = 0; x < grid[0].length; x++) {
+            const d = dist[y][x];
+            if (grid[y][x] === 0 && isFinite(d)) {
+              dmin = Math.min(dmin, d);
+              dmax = Math.max(dmax, d);
+            }
+          }
+        const span = Math.max(1e-6, dmax - dmin);
+        for (let y = 0; y < grid.length; y++)
+          for (let x = 0; x < grid[0].length; x++) {
+            if (grid[y][x] !== 0) continue;
+            const d = dist[y][x];
+            if (!isFinite(d)) continue;
+            const t = (d - dmin) / span;
+            overlayGroup.add(
+              rectOverlay(
+                heatColor(t),
+                x,
+                y,
+                state.N,
+                0.16,
+                heatOpacity,
+                "heat"
+              )
+            );
+          }
+        const path = pathByGradient(dist, grid, start, goal);
+        for (const [x, y] of path)
+          overlayGroup.add(
+            rectOverlay(COLORS.path, x, y, state.N, 0.26, 1, "path")
+          );
+      }
+
+      // ---------- FAST core (heaps/buckets; no per-step recording) ----------
+      class MinHeap {
+        constructor() {
+          this.a = [];
+        }
+        push(node, key) {
+          this.a.push([key, node]);
+          this._up(this.a.length - 1);
+        }
+        pop() {
+          if (!this.a.length) return null;
+          const top = this.a[0];
+          const last = this.a.pop();
+          if (this.a.length) {
+            this.a[0] = last;
+            this._down(0);
+          }
+          return top;
+        }
+        _up(i) {
+          const a = this.a;
+          while (i) {
+            const p = (i - 1) >> 1;
+            if (a[p][0] <= a[i][0]) break;
+            [a[p], a[i]] = [a[i], a[p]];
+            i = p;
+          }
+        }
+        _down(i) {
+          const a = this.a;
+          for (;;) {
+            let l = i * 2 + 1,
+              r = l + 1,
+              s = i;
+            if (l < a.length && a[l][0] < a[s][0]) s = l;
+            if (r < a.length && a[r][0] < a[s][0]) s = r;
+            if (s === i) break;
+            [a[i], a[s]] = [a[s], a[i]];
+            i = s;
+          }
+        }
+      }
+
+      function isSmallIntegerWeights(weights) {
+        for (let y = 0; y < weights.length; y++)
+          for (let x = 0; x < weights[0].length; x++) {
+            const w = weights[y][x];
+            if (w === INF) continue;
+            if (!Number.isFinite(w)) return false;
+            if (w < 1 || w > 9 || (w | 0) !== w) return false;
+          }
+        return true;
+      }
+      function idxFromWH(W, x, y) {
+        return y * W + x;
+      }
+
+      // Dijkstra from START (buckets if 1..9, else heap)
+      function dijkstraStart_fast(grid, weights, start, goal) {
+        const W = grid[0].length,
+          H = grid.length,
+          N = W * H,
+          s = idxFromWH(W, start.x, start.y),
+          t = idxFromWH(W, goal.x, goal.y);
+        const dist = new Float64Array(N);
+        dist.fill(INF);
+        const prevx = new Int32Array(N),
+          prevy = new Int32Array(N);
+        prevx.fill(-1);
+        prevy.fill(-1);
+
+        let relax = 0,
+          improved = 0,
+          steps = 0,
+          frontSum = 0,
+          maxFrontier = 0;
+
+        if (isSmallIntegerWeights(weights)) {
+          const C = 9,
+            maxKey = C * N + 1;
+          const buckets = Array.from({ length: maxKey }, () => []);
+          dist[s] = 0;
+          buckets[0].push(s);
+          let b = 0,
+            inQ = 1;
+          while (inQ) {
+            while (b < maxKey && buckets[b].length === 0) b++;
+            const u = buckets[b].pop();
+            inQ--;
+            if (b !== (dist[u] | 0)) continue;
+            steps++;
+            maxFrontier = Math.max(maxFrontier, inQ);
+            frontSum += inQ;
+
+            const ux = u % W,
+              uy = (u / W) | 0,
+              du = dist[u];
+            // neighbors
+            const tryEdge = (vx, vy) => {
+              const v = idxFromWH(W, vx, vy),
+                w = weights[vy][vx] | 0;
+              relax++;
+              const nd = du + w;
+              if (nd < dist[v]) {
+                dist[v] = nd;
+                prevx[v] = ux;
+                prevy[v] = uy;
+                buckets[nd | 0].push(v);
+                inQ++;
+                improved++;
+              }
+            };
+            if (ux + 1 < W && grid[uy][ux + 1] === 0) tryEdge(ux + 1, uy);
+            if (ux - 1 >= 0 && grid[uy][ux - 1] === 0) tryEdge(ux - 1, uy);
+            if (uy + 1 < H && grid[uy + 1][ux] === 0) tryEdge(ux, uy + 1);
+            if (uy - 1 >= 0 && grid[uy - 1][ux] === 0) tryEdge(ux, uy - 1);
+            if (u === t) break;
+          }
+        } else {
+          const heap = new MinHeap();
+          dist[s] = 0;
+          heap.push(s, 0);
+          while (true) {
+            const top = heap.pop();
+            if (!top) break;
+            steps++;
+            const [d, u] = top;
+            if (d !== dist[u]) continue;
+            const ux = u % W,
+              uy = (u / W) | 0;
+            const du = d;
+            maxFrontier = Math.max(maxFrontier, heap.a.length);
+            frontSum += heap.a.length;
+            const tryEdge = (vx, vy) => {
+              const v = idxFromWH(W, vx, vy),
+                w = weights[vy][vx];
+              relax++;
+              const nd = du + w;
+              if (nd < dist[v]) {
+                dist[v] = nd;
+                prevx[v] = ux;
+                prevy[v] = uy;
+                heap.push(v, nd);
+                improved++;
+              }
+            };
+            if (ux + 1 < W && grid[uy][ux + 1] === 0) tryEdge(ux + 1, uy);
+            if (ux - 1 >= 0 && grid[uy][ux - 1] === 0) tryEdge(ux - 1, uy);
+            if (uy + 1 < H && grid[uy + 1][ux] === 0) tryEdge(ux, uy + 1);
+            if (uy - 1 >= 0 && grid[uy - 1][ux] === 0) tryEdge(ux, uy - 1);
+            if (u === t) break;
+          }
+        }
+        const avgFrontier = steps ? +(frontSum / steps).toFixed(1) : 0;
+        return {
+          dist,
+          prevx,
+          prevy,
+          relax,
+          improved,
+          steps,
+          avgFrontier,
+          maxFrontier,
+        };
+      }
+
+      // A* (heap) — manhattan heuristic
+      function astarStart_fast(grid, weights, start, goal) {
+        const W = grid[0].length,
+          H = grid.length,
+          N = W * H,
+          s = idxFromWH(W, start.x, start.y),
+          t = idxFromWH(W, goal.x, goal.y);
+        const dist = new Float64Array(N);
+        dist.fill(INF);
+        const prevx = new Int32Array(N),
+          prevy = new Int32Array(N);
+        prevx.fill(-1);
+        prevy.fill(-1);
+
+        const heap = new MinHeap();
+        const h0 = Math.abs(start.x - goal.x) + Math.abs(start.y - goal.y);
+        dist[s] = 0;
+        heap.push(s, h0);
+
+        let relax = 0,
+          improved = 0,
+          steps = 0,
+          frontSum = 0,
+          maxFrontier = 0;
+
+        while (true) {
+          const top = heap.pop();
+          if (!top) break;
+          steps++;
+          const [f, u] = top;
+          const ux = u % W,
+            uy = (u / W) | 0;
+          const g = dist[u];
+          if (f < g) continue; // stale
+          maxFrontier = Math.max(maxFrontier, heap.a.length);
+          frontSum += heap.a.length;
+          if (u === t) break;
+
+          const tryEdge = (vx, vy) => {
+            const v = idxFromWH(W, vx, vy);
+            const w = weights[vy][vx];
+            relax++;
+            const ng = g + w;
+            if (ng < dist[v]) {
+              dist[v] = ng;
+              prevx[v] = ux;
+              prevy[v] = uy;
+              const h = Math.abs(vx - goal.x) + Math.abs(vy - goal.y);
+              heap.push(v, ng + h);
+              improved++;
+            }
+          };
+          if (ux + 1 < W && grid[uy][ux + 1] === 0) tryEdge(ux + 1, uy);
+          if (ux - 1 >= 0 && grid[uy][ux - 1] === 0) tryEdge(ux - 1, uy);
+          if (uy + 1 < H && grid[uy + 1][ux] === 0) tryEdge(ux, uy + 1);
+          if (uy - 1 >= 0 && grid[uy - 1][ux] === 0) tryEdge(ux, uy - 1);
+        }
+        const avgFrontier = steps ? +(frontSum / steps).toFixed(1) : 0;
+        return {
+          dist,
+          prevx,
+          prevy,
+          relax,
+          improved,
+          steps,
+          avgFrontier,
+          maxFrontier,
+        };
+      }
+
+      // Bird’s-eye FAST (goal-rooted) — heap or buckets; optional band mask
+      function dijkstraFromGoal_fast(
+        grid,
+        weights,
+        goal,
+        useBuckets = true,
+        bandMask = null
+      ) {
+        const W = grid[0].length,
+          H = grid.length,
+          N = W * H;
+        const dist = new Float64Array(N);
+        dist.fill(INF);
+        const g = idxFromWH(W, goal.x, goal.y);
+        if (bandMask && !bandMask[goal.y][goal.x])
+          return { dist, relax: 0, improved: 0 };
+        let relax = 0,
+          improved = 0;
+
+        const allowed = (x, y) =>
+          grid[y][x] === 0 && (!bandMask || bandMask[y][x] === 1);
+
+        if (useBuckets && isSmallIntegerWeights(weights)) {
+          const C = 9,
+            maxKey = C * N + 1;
+          const buckets = Array.from({ length: maxKey }, () => []);
+          dist[g] = 0;
+          buckets[0].push(g);
+          let b = 0,
+            inQ = 1;
+          while (inQ) {
+            while (b < maxKey && buckets[b].length === 0) b++;
+            const u = buckets[b].pop();
+            inQ--;
+            if (b !== (dist[u] | 0)) continue;
+            const ux = u % W,
+              uy = (u / W) | 0,
+              du = dist[u];
+            const tryEdge = (vx, vy) => {
+              if (!allowed(vx, vy)) return;
+              const v = idxFromWH(W, vx, vy),
+                w = weights[vy][vx] | 0;
+              relax++;
+              const nd = du + w;
+              if (nd < dist[v]) {
+                dist[v] = nd;
+                buckets[nd | 0].push(v);
+                inQ++;
+                improved++;
+              }
+            };
+            if (ux + 1 < W) tryEdge(ux + 1, uy);
+            if (ux - 1 >= 0) tryEdge(ux - 1, uy);
+            if (uy + 1 < H) tryEdge(ux, uy + 1);
+            if (uy - 1 >= 0) tryEdge(ux, uy - 1);
+          }
+        } else {
+          const heap = new MinHeap();
+          dist[g] = 0;
+          heap.push(g, 0);
+          while (true) {
+            const top = heap.pop();
+            if (!top) break;
+            const [d, u] = top;
+            if (d !== dist[u]) continue;
+            const ux = u % W,
+              uy = (u / W) | 0,
+              du = d;
+            const tryEdge = (vx, vy) => {
+              if (!allowed(vx, vy)) return;
+              const v = idxFromWH(W, vx, vy),
+                w = weights[vy][vx];
+              relax++;
+              const nd = du + w;
+              if (nd < dist[v]) {
+                dist[v] = nd;
+                heap.push(v, nd);
+                improved++;
+              }
+            };
+            if (ux + 1 < W) tryEdge(ux + 1, uy);
+            if (ux - 1 >= 0) tryEdge(ux - 1, uy);
+            if (uy + 1 < H) tryEdge(ux, uy + 1);
+            if (uy - 1 >= 0) tryEdge(ux, uy - 1);
+          }
+        }
+        return { dist, relax, improved };
+      }
+
+      // Band mask around the straight line start→goal (Euclidean distance to segment ≤ R)
+      function makeBandMask(grid, start, goal, R) {
+        const H = grid.length,
+          W = grid[0].length;
+        const mask = Array.from({ length: H }, () => Array(W).fill(0));
+        const x1 = start.x,
+          y1 = start.y,
+          x2 = goal.x,
+          y2 = goal.y;
+        const dx = x2 - x1,
+          dy = y2 - y1,
+          L2 = dx * dx + dy * dy || 1;
+        function distPointToSegment(px, py) {
+          const t = Math.max(
+            0,
+            Math.min(1, ((px - x1) * dx + (py - y1) * dy) / L2)
+          );
+          const qx = x1 + t * dx,
+            qy = y1 + t * dy;
+          const ex = px - qx,
+            ey = py - qy;
+          return Math.hypot(ex, ey);
+        }
+        for (let y = 0; y < H; y++)
+          for (let x = 0; x < W; x++) {
+            if (grid[y][x] !== 0) continue;
+            const d = distPointToSegment(x, y);
+            if (d <= R) mask[y][x] = 1;
+          }
+        // ensure start & goal included
+        mask[start.y][start.x] = 1;
+        mask[goal.y][goal.x] = 1;
+        return mask;
+      }
+
+      // ---------- Metrics / comparison ----------
+      function countShortestPaths(grid, weights, dist, start, goal) {
+        const H = grid.length,
+          W = grid[0].length;
+        const nodes = [];
+        for (let y = 0; y < H; y++)
+          for (let x = 0; x < W; x++) {
+            const d = dist?.[y]?.[x];
+            if (grid[y][x] === 0 && d < INF) nodes.push({ x, y, d });
+          }
+        nodes.sort((a, b) => a.d - b.d || a.y - b.y || a.x - b.x);
+        const idx = (x, y) => y * W + x;
+        const ways = new Map();
+        ways.set(idx(start.x, start.y), 1);
+        for (const { x, y, d } of nodes) {
+          const curK = idx(x, y),
+            curW = ways.get(curK) || 0;
+          for (const [nx, ny] of neighbors(grid, x, y)) {
+            const w = weights[ny][nx];
+            if (dist[ny][nx] === d + w) {
+              const nk = idx(nx, ny);
+              ways.set(nk, (ways.get(nk) || 0) + curW);
+            }
+          }
+        }
+        return ways.get(idx(goal.x, goal.y)) || 0;
+      }
+
+      function to2D(distVec, grid) {
+        const H = grid.length,
+          W = grid[0].length;
+        const D = Array.from({ length: H }, () => Array(W).fill(INF));
+        for (let y = 0; y < H; y++)
+          for (let x = 0; x < W; x++) {
+            D[y][x] = distVec[y * W + x];
+          }
+        return D;
+      }
+
+      function renderComparison(rows) {
+        ui.comparePanel.style.display = "block";
+        // dynamic header can have 5 columns if band is shown (we will just print an extra runtime row)
+        const head = ["Metric", "Dijkstra", "A*", "Hybrid", "Bird’s-eye"];
+        const cells = [
+          head,
+          ["Steps", rows.d.steps, rows.a.steps, rows.h.steps, "—"],
+          [
+            "Total relax",
+            rows.d.relax,
+            rows.a.relax,
+            rows.h.relax,
+            rows.b.relax,
+          ],
+          [
+            "Improved relax",
+            rows.d.improved,
+            rows.a.improved,
+            rows.h.improved,
+            rows.b.improved,
+          ],
+          [
+            "Avg frontier",
+            rows.d.avgFrontier.toFixed(1),
+            rows.a.avgFrontier.toFixed(1),
+            rows.h.avgFrontier.toFixed(1),
+            "—",
+          ],
+          [
+            "Max frontier",
+            rows.d.maxFrontier,
+            rows.a.maxFrontier,
+            rows.h.maxFrontier,
+            "—",
+          ],
+          [
+            "Avg pivots/step",
+            "1.00",
+            rows.a.avgPivots?.toFixed?.(2) ?? "—",
+            rows.h.avgPivots?.toFixed?.(2) ?? "—",
+            "—",
+          ],
+          [
+            "Equal-cost paths",
+            rows.d.paths,
+            rows.a.paths,
+            rows.h.paths,
+            rows.b.paths,
+          ],
+          [
+            "Runtime (ms)",
+            rows.dms.toFixed(1),
+            rows.ams.toFixed(1),
+            rows.hms.toFixed(1),
+            rows.bms.toFixed(1),
+          ],
+        ];
+        // If band ran, show a bonus runtime row
+        if (rows.bmsBand != null) {
+          cells.push([
+            "Bird’s-eye Band (ms)",
+            "—",
+            "—",
+            "—",
+            rows.bmsBand.toFixed(1),
+          ]);
+        }
+
+        ui.cmpGrid.innerHTML = cells
+          .map((r, i) =>
+            i === 0
+              ? r.map((v) => `<div class="dim">${v}</div>`).join("")
+              : `<div>${r[0]}</div><div><b>${r[1]}</b></div><div><b>${r[2]}</b></div><div><b>${r[3]}</b></div><div><b>${r[4]}</b></div>`
+          )
+          .join("");
+        ui.cmpGrid.style.gridTemplateColumns = "auto auto auto auto auto";
+      }
+
+      // ---------- Interaction / animation ----------
+      const ui = {
+        algo: document.getElementById("algo"),
+        size: document.getElementById("size"),
+        braid: document.getElementById("braid"),
+        links: document.getElementById("links"),
+        ties: document.getElementById("ties"),
+        weighted: document.getElementById("weighted"),
+        k: document.getElementById("k"),
+        speed: document.getElementById("speed"),
+        regen: document.getElementById("regen"),
+        reset: document.getElementById("reset"),
+        play: document.getElementById("play"),
+        step: document.getElementById("step"),
+        birdseye: document.getElementById("birdseye"),
+        heat: document.getElementById("heat"),
+        stats: document.getElementById("stats"),
+        compare: document.getElementById("compare"),
+        comparePanel: document.getElementById("comparePanel"),
+        cmpGrid: document.getElementById("cmpGrid"),
+        fastMode: document.getElementById("fastMode"),
+        useBuckets: document.getElementById("useBuckets"),
+        bandOn: document.getElementById("bandOn"),
+        bandR: document.getElementById("bandR"),
+      };
+
+      let state = {
+        grid: null,
+        weights: null,
+        N: 41,
+        start: { x: 1, y: 1 },
+        goal: null,
+        steps: [],
+        stepIndex: 0,
+        playing: false,
+        speed: 1,
+        heatOpacity: 0.6,
+        dragging: null,
+      };
+
+      function reconstructPath(prev, start, goal) {
+        const out = [];
+        let cur = key(goal.x, goal.y);
+        const sK = key(start.x, start.y);
+        if (!prev.has(cur) && cur !== sK) return out;
+        while (cur && cur !== sK) {
+          const [x, y] = cur.split("_").map(Number);
+          out.push([x, y]);
+          const p = prev.get(cur);
+          if (!p) break;
+          cur = key(p[0], p[1]);
+        }
+        out.push([start.x, start.y]);
+        out.reverse();
+        return out;
+      }
+
+      function planAndRender() {
+        const mode = ui.algo.value;
+        const K = clamp(parseInt(ui.k.value, 10) || 3, 1, 8);
+        if (mode === "bird") {
+          const t0 = performance.now();
+          const dist = distanceFieldFromGoal_visual(
+            state.grid,
+            state.weights,
+            state.goal
+          );
+          const t1 = performance.now();
+          showDistanceField(
+            dist,
+            state.grid,
+            state.start,
+            state.goal,
+            state.heatOpacity
+          );
+          const paths = countShortestPaths(
+            state.grid,
+            state.weights,
+            dist,
+            state.start,
+            state.goal
+          );
+          ui.stats.innerHTML = `<div>Bird’s-eye: <b>${(t1 - t0).toFixed(
+            1
+          )} ms</b> • Equal-cost paths: <b>${paths}</b></div>`;
+          state.steps = [];
+          state.stepIndex = 0;
+          state.playing = false;
+          return;
+        }
+        state.steps =
+          mode === "dijkstra"
+            ? dijkstraGrid(state.grid, state.weights, state.start, state.goal)
+            : hybridGrid(state.grid, state.weights, state.start, state.goal, K);
+        state.stepIndex = 0;
+        state.playing = false;
+
+        // draw first step overlays
+        while (overlayGroup.children.length > 2) {
+          const m = overlayGroup.children.pop();
+          m.geometry?.dispose?.();
+          m.material?.dispose?.();
+        }
+        if (state.steps.length) {
+          const st = state.steps[0];
+          for (const k of st.visited) {
+            const [x, y] = k.split("_").map(Number);
+            overlayGroup.add(
+              rectOverlay(COLORS.visited, x, y, state.N, 0.14, 1, "visit")
+            );
+          }
+          for (const k of st.frontier) {
+            const [x, y] = k.split("_").map(Number);
+            overlayGroup.add(
+              rectOverlay(COLORS.frontier, x, y, state.N, 0.2, 1, "frontier")
+            );
+          }
+          for (const r of st.relaxes) {
+            if (r.improved)
+              overlayGroup.add(
+                rectOverlay(
+                  COLORS.improved,
+                  r.to[0],
+                  r.to[1],
+                  state.N,
+                  0.22,
+                  1,
+                  "impr"
+                )
+              );
+          }
+          const last = state.steps[state.steps.length - 1];
+          const path = reconstructPath(last.prev, state.start, state.goal);
+          for (const [x, y] of path)
+            overlayGroup.add(
+              rectOverlay(COLORS.path, x, y, state.N, 0.26, 1, "path")
+            );
+          ui.stats.innerHTML = `
+        <div>Steps: <b>${state.steps.length}</b> — Mode: <b>${mode}</b>${
+            mode === "hybrid" ? ` (k=${K})` : ""
+          }</div>
+      `;
+        }
+      }
+
+      function stepRender(idx) {
+        const st = state.steps[idx];
+        while (overlayGroup.children.length > 2) {
+          const m = overlayGroup.children.pop();
+          m.geometry?.dispose?.();
+          m.material?.dispose?.();
+        }
+        for (const k of st.visited) {
+          const [x, y] = k.split("_").map(Number);
+          overlayGroup.add(
+            rectOverlay(COLORS.visited, x, y, state.N, 0.14, 1, "visit")
+          );
+        }
+        for (const k of st.frontier) {
+          const [x, y] = k.split("_").map(Number);
+          overlayGroup.add(
+            rectOverlay(COLORS.frontier, x, y, state.N, 0.2, 1, "frontier")
+          );
+        }
+        for (const r of st.relaxes) {
+          if (r.improved)
+            overlayGroup.add(
+              rectOverlay(
+                COLORS.improved,
+                r.to[0],
+                r.to[1],
+                state.N,
+                0.22,
+                1,
+                "impr"
+              )
+            );
+        }
+        if (idx === state.steps.length - 1) {
+          const path = reconstructPath(st.prev, state.start, state.goal);
+          for (const [x, y] of path)
+            overlayGroup.add(
+              rectOverlay(COLORS.path, x, y, state.N, 0.26, 1, "path")
+            );
+        }
+        ui.stats.innerHTML = `
+      <div>Step <b>${idx + 1}</b> / ${state.steps.length} — Mode: <b>${
+          ui.algo.value
+        }</b></div>
+    `;
+      }
+
+      // ---------- State & UI ----------
+      function regenerate() {
+        state.N = clamp(parseInt(ui.size.value, 10) || 41, 11, 81);
+        if (state.N % 2 === 0) state.N += 1;
+        state.grid = genMaze(state.N);
+        braidMaze(state.grid, parseInt(ui.braid.value, 10) || 0);
+        addLinks(state.grid, parseInt(ui.links.value, 10) || 0);
+        state.weights = makeWeights(state.grid, ui.weighted.checked);
+        applyTies(state.weights, state.grid, parseInt(ui.ties.value, 10) || 0);
+        state.start = { x: 1, y: 1 };
+        state.goal = { x: state.N - 2, y: state.N - 2 };
+        drawGrid(state.grid, state.weights, state.start, state.goal);
+        ui.stats.innerHTML = `<div>Ready — choose a mode or click <b>🛰️</b>.</div>`;
+        planAndRender();
+      }
+
+      function reset() {
+        state.stepIndex = 0;
+        state.playing = false;
+        if (state.steps.length) stepRender(0);
+      }
+
+      // mouse dragging start/goal
+      const raycaster = new THREE.Raycaster(),
+        mouse = new THREE.Vector2();
+      function pickCell(ev) {
+        const rect = renderer.domElement.getBoundingClientRect();
+        mouse.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        const hits = raycaster.intersectObjects(floorGroup.children);
+        if (!hits.length) return null;
+        const pos = hits[0].object.position;
+        const half = (state.N - 1) / 2;
+        const gx = Math.round(pos.x / 1 + half),
+          gy = Math.round(pos.z / 1 + half);
+        if (gx < 0 || gy < 0 || gx >= state.N || gy >= state.N) return null;
+        if (state.grid[gy][gx] === 1) return null;
+        return { x: gx, y: gy };
+      }
+      renderer.domElement.addEventListener("mousedown", (e) => {
+        const p = pickCell(e);
+        if (!p) return;
+        if (p.x === state.start.x && p.y === state.start.y)
+          state.dragging = "start";
+        else if (p.x === state.goal.x && p.y === state.goal.y)
+          state.dragging = "goal";
+        else state.dragging = null;
+      });
+      renderer.domElement.addEventListener("mousemove", (e) => {
+        if (!state.dragging) return;
+        const p = pickCell(e);
+        if (!p) return;
+        if (state.dragging === "start") state.start = p;
+        else if (state.dragging === "goal") state.goal = p;
+        drawGrid(state.grid, state.weights, state.start, state.goal);
+      });
+      window.addEventListener("mouseup", () => {
+        if (!state.dragging) return;
+        state.dragging = null;
+        planAndRender();
+      });
+
+      // listeners
+      ui.algo.addEventListener("change", planAndRender);
+      ui.k.addEventListener("change", planAndRender);
+      ui.size.addEventListener("change", regenerate);
+      ui.braid.addEventListener("input", regenerate);
+      ui.links.addEventListener("input", regenerate);
+      ui.ties.addEventListener("input", regenerate);
+      ui.weighted.addEventListener("change", regenerate);
+      ui.regen.addEventListener("click", regenerate);
+      ui.reset.addEventListener("click", reset);
+      ui.play.addEventListener("click", () => {
+        if (ui.algo.value === "bird") return;
+        state.playing = !state.playing;
+      });
+      ui.step.addEventListener("click", () => {
+        if (!state.steps.length) return;
+        state.playing = false;
+        state.stepIndex = Math.min(state.stepIndex + 1, state.steps.length - 1);
+        stepRender(state.stepIndex);
+      });
+      ui.heat.addEventListener("input", () => {
+        state.heatOpacity = Number(ui.heat.value);
+        overlayGroup.children.forEach((m) => {
+          if (m.userData?.kind === "heat") {
+            m.material.transparent = state.heatOpacity < 1;
+            m.material.opacity = state.heatOpacity;
+            m.material.needsUpdate = true;
+          }
+        });
+      });
+      ui.birdseye.addEventListener("click", () => {
+        const t0 = performance.now();
+        const dist = distanceFieldFromGoal_visual(
+          state.grid,
+          state.weights,
+          state.goal
+        );
+        const t1 = performance.now();
+        showDistanceField(
+          dist,
+          state.grid,
+          state.start,
+          state.goal,
+          state.heatOpacity
+        );
+        const paths = countShortestPaths(
+          state.grid,
+          state.weights,
+          dist,
+          state.start,
+          state.goal
+        );
+        ui.stats.innerHTML = `<div>Bird’s-eye: <b>${(t1 - t0).toFixed(
+          1
+        )} ms</b> • Equal-cost paths: <b>${paths}</b></div>`;
+      });
+
+      // Compare all four (fast)
+      ui.compare.addEventListener("click", () => {
+        const K = clamp(parseInt(ui.k.value, 10) || 3, 1, 8);
+        const useBuckets = ui.useBuckets.checked;
+        const bandOn = ui.bandOn.checked;
+        const R = clamp(parseInt(ui.bandR.value, 10) || 8, 2, 50);
+
+        // Dijkstra (start)
+        let t0 = performance.now();
+        const dFast = dijkstraStart_fast(
+          state.grid,
+          state.weights,
+          state.start,
+          state.goal
+        );
+        let t1 = performance.now();
+
+        // A*
+        const aFast = astarStart_fast(
+          state.grid,
+          state.weights,
+          state.start,
+          state.goal
+        );
+        let t2 = performance.now();
+
+        // Hybrid
+        const hFast = (function () {
+          // reuse the simpler no-logging hybrid we had (but with metrics)
+          const H = state.grid.length,
+            W = state.grid[0].length;
+          const dist = Array.from({ length: H }, () => Array(W).fill(INF));
+          const prev = new Map();
+          let frontier = new Set([key(state.start.x, state.start.y)]);
+          dist[state.start.y][state.start.x] = 0;
+          const goalKey = key(state.goal.x, state.goal.y);
+          let relax = 0,
+            improved = 0,
+            steps = 0,
+            frontSum = 0,
+            maxFrontier = frontier.size,
+            pivotsTotal = 0;
+
+          const sortFrontier = (set) =>
+            [...set].sort((a, b) => {
+              const [ax, ay] = a.split("_").map(Number),
+                [bx, by] = b.split("_").map(Number);
+              const da = dist[ay][ax],
+                db = dist[by][bx];
+              if (da !== db) return da - db;
+              if (ay !== by) return ay - by;
+              return ax - bx;
+            });
+
+          while (frontier.size) {
+            const ord = sortFrontier(frontier);
+            steps++;
+            frontSum += ord.length;
+            maxFrontier = Math.max(maxFrontier, ord.length);
+            let Kdyn = K,
+              F = ord.length;
+            if (F > 400) Kdyn = Math.max(1, Math.floor(K / 2));
+            else if (F > 150) Kdyn = Math.max(1, Math.floor((2 * K) / 3));
+            else if (F < 20) Kdyn = Math.min(K * 2, 8);
+            const pivots = ord.filter((_, i) => i % Kdyn === 0);
+            if (!pivots.length && ord.length) pivots.push(ord[0]);
+            pivotsTotal += pivots.length;
+
+            const newly = new Set();
+            for (const pk of pivots) {
+              const [ux, uy] = pk.split("_").map(Number);
+              frontier.delete(pk);
+              for (const [vx, vy] of neighbors(state.grid, ux, uy)) {
+                relax++;
+                const nd = dist[uy][ux] + state.weights[vy][vx];
+                if (nd < dist[vy][vx]) {
+                  dist[vy][vx] = nd;
+                  prev.set(key(vx, vy), [ux, uy]);
+                  newly.add(key(vx, vy));
+                  improved++;
+                }
+              }
+              if (pk === goalKey) {
+                frontier.clear();
+                break;
+              }
+            }
+            for (const k of newly) frontier.add(k);
+            if (frontier.size > Math.max(50, K * 4)) {
+              const shr = sortFrontier(frontier).filter((_, i) => i % 2 === 0);
+              frontier = new Set(shr);
+            }
+          }
+          return {
+            dist,
+            prev,
+            relax,
+            improved,
+            steps,
+            avgFrontier: steps ? +(frontSum / steps).toFixed(1) : 0,
+            maxFrontier,
+            avgPivots: steps ? +(pivotsTotal / steps).toFixed(2) : 0,
+          };
+        })();
+        let t3 = performance.now();
+
+        // Bird’s-eye (goal-rooted) FULL
+        const bFull = dijkstraFromGoal_fast(
+          state.grid,
+          state.weights,
+          state.goal,
+          useBuckets,
+          null
+        );
+        let t4 = performance.now();
+
+        // Bird’s-eye BAND (optional)
+        let bBand = null,
+          t5 = t4;
+        if (bandOn) {
+          const mask = makeBandMask(state.grid, state.start, state.goal, R);
+          bBand = dijkstraFromGoal_fast(
+            state.grid,
+            state.weights,
+            state.goal,
+            useBuckets,
+            mask
+          );
+          t5 = performance.now();
+        }
+
+        // convert vectors to 2D for equal-paths counting
+        const d2D = to2D(dFast.dist, state.grid);
+        const a2D = to2D(aFast.dist, state.grid);
+        const h2D = hFast.dist;
+        const b2D = (() => {
+          const H = state.grid.length,
+            W = state.grid[0].length;
+          const D = Array.from({ length: H }, () => Array(W).fill(INF));
+          for (let y = 0; y < H; y++)
+            for (let x = 0; x < W; x++) {
+              D[y][x] = bFull.dist[y * W + x];
+            }
+          return D;
+        })();
+        const pathsD = countShortestPaths(
+          state.grid,
+          state.weights,
+          d2D,
+          state.start,
+          state.goal
+        );
+        const pathsA = countShortestPaths(
+          state.grid,
+          state.weights,
+          a2D,
+          state.start,
+          state.goal
+        );
+        const pathsH = countShortestPaths(
+          state.grid,
+          state.weights,
+          h2D,
+          state.start,
+          state.goal
+        );
+        const pathsB = countShortestPaths(
+          state.grid,
+          state.weights,
+          b2D,
+          state.start,
+          state.goal
+        );
+
+        renderComparison({
+          d: {
+            steps: dFast.steps,
+            relax: dFast.relax,
+            improved: dFast.improved,
+            avgFrontier: dFast.avgFrontier,
+            maxFrontier: dFast.maxFrontier,
+            paths: pathsD,
+          },
+          a: {
+            steps: aFast.steps,
+            relax: aFast.relax,
+            improved: aFast.improved,
+            avgFrontier: aFast.avgFrontier,
+            maxFrontier: aFast.maxFrontier,
+            paths: pathsA,
+            avgPivots: 1,
+          },
+          h: {
+            steps: hFast.steps,
+            relax: hFast.relax,
+            improved: hFast.improved,
+            avgFrontier: hFast.avgFrontier,
+            maxFrontier: hFast.maxFrontier,
+            paths: pathsH,
+            avgPivots: hFast.avgPivots,
+          },
+          b: {
+            steps: "—",
+            relax: bFull.relax,
+            improved: bFull.improved,
+            paths: pathsB,
+          },
+          dms: t1 - t0,
+          ams: t2 - t1,
+          hms: t3 - t2,
+          bms: t4 - t3,
+          bmsBand: bandOn ? t5 - t4 : null,
+        });
+      });
+
+      // animation loop
+      let acc = 0,
+        last = performance.now();
+      function loop(t) {
+        const dt = (t - last) / 1000;
+        last = t;
+        controls.update();
+        renderer.render(scene, camera);
+        if (state.playing && state.steps.length) {
+          acc += dt * Number(ui.speed.value);
+          if (acc > 0.08) {
+            acc = 0;
+            if (state.stepIndex < state.steps.length - 1) {
+              state.stepIndex++;
+              stepRender(state.stepIndex);
+            } else state.playing = false;
+          }
+        }
+        requestAnimationFrame(loop);
+      }
+
+      // boot
+      regenerate();
+      requestAnimationFrame(loop);
+    </script>
+  </body>
+</html>
