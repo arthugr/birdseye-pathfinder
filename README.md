@@ -5,6 +5,9 @@
 
 ---
 
+## Live Demo
+[CLICK HERE](https://arthugr.github.io/birdseye-pathfinder/demo.html)
+
 ## Table of Contents
 - [Overview](#overview)
 - [Key Idea](#key-idea)
@@ -166,4 +169,5 @@ Yes. You can build a partial field (or heuristic distance map) or run A\* with a
 ---
 
 ## License
+
 MIT © 2025 Arthur Grustins
